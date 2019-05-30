@@ -4,45 +4,8 @@
 #include "hitable_list.h"
 #include "float.h"
 #include "camera.h"
+#include "material.h"
 
-inline float rand_unit() {
-    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-}
-
-// Chapter 4
-bool hit_sphere(const vec3& center, float radius, const ray& r) {
-    vec3 oc = r.origin() - center;
-    float a = dot(r.direction(), r.direction());
-    float b = 2.0 * dot(oc, r.direction());
-    float c = dot(oc, oc) - radius*radius;
-    float discrim = b*b - 4*a*c;
-    return (discrim > 0);
-}
-
-//Chapter 5
-float hit_sphere2(const vec3& center, float radius, const ray& r) {
-    vec3 oc = r.origin() - center;
-    float a = dot(r.direction(), r.direction());
-    float b = 2.0 * dot(oc, r.direction());
-    float c = dot(oc, oc) - radius*radius;
-    float discrim = b*b - 4*a*c;
- 
-    if (discrim < 0 ) {
-        return -1.0;
-    } 
-    else {
-        return (-b - sqrt(discrim)) / (2.0 * a);
-    }
-}
-
-// Chapter 7
-vec3 random_in_unit_sphere() {
-    vec3 p;
-    do {
-        p = 2.0 * vec3(rand_unit(), rand_unit(), rand_unit()) - vec3(1,1,1);
-    } while (p.squared_length() >= 1.0);
-    return p;
-}
 
 /*
 vec3 color(const ray& r) {
@@ -84,25 +47,75 @@ vec3 color(const ray& r, hitable *world) {
     }
 }
 
+//Chapter 8
+vec3 color(const ray& r, hitable *world, int depth) {
+    hit_record rec;
+    if (world->hit(r, 0.001, FLT_MAX, rec)) {
+        ray scattered;
+        vec3 attenuation;
+        if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
+            return attenuation*color(scattered, world, depth+1);
+        }
+        else {
+            return vec3(0,0,0);
+        }
+    } 
+    else {
+        vec3 unit_dir = unit_vector(r.direction());
+        float t = 0.5*(unit_dir.y() + 1.0);
+        return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+    }
+}
 
 int main() {
-    int nx = 1280;
-    int ny = 720;
-    int ns = 1;
+    int nx = 250;
+    int ny = 140;
+    int ns = 100;
     std::cout << "P3\n" << nx << " " << ny << "\n255\n";
     //vec3 lower_left_corner(-2.0, -1.0, -1.0);
     //vec3 horizontal(4.0, 0.0, 0.0);
     //vec3 vertical(0.0, 2.0, 0.0);
     //vec3 origin(0.0, 0.0, 0.0);
 
+    /*
     //Chapter 5.1
     hitable *list[2];
     list[0] = new sphere(vec3(0,0,-1), 0.5);
     list[1] = new sphere(vec3(0, -100.5, -1), 100);
     hitable *world = new hitable_list(list,2);
-    
+    */
+
+
+    //Ch 8
+    hitable *list[4];
+    list[0] = new sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
+    list[1] = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
+    list[2] = new sphere(vec3(1,0,-1), 0.5, new metal(vec3(0.8, 0.6, 0.2), 0.2));
+    //list[3] = new sphere(vec3(-1.5,0,-1.5), 0.5, new metal(vec3(0.8, 0.8, 0.8), 1.0));
+    list[3] = new sphere(vec3(-1,0,-1), 0.5, new dielectric(1.5));
+    //list[4] = new sphere(vec3(-1,0,-1), -0.45, new dielectric(1.5));
+    hitable *world = new hitable_list(list,4);
+  
+
+ /*
+    //Ch 10
+    hitable *list[2];
+    float R = cos(M_PI/4);
+    list[0] = new sphere(vec3(-R,0,-1), R, new lambertian(vec3(0,0,1)));
+    list[1] = new sphere(vec3(R,0,-1), R, new lambertian(vec3(1,0,0)));
+    hitable *world = new hitable_list(list,2);
+    */
+
     //Ch 6
-    camera cam;
+    //camera cam;
+    //camera cam(90, float(nx)/float(ny));
+    //camera cam(vec3(-2, 2, 1), vec3(0,0,-1), vec3(0,1,0), 70, float(nx)/float(ny));
+
+    vec3 lookfrom(3,3,2);
+    vec3 lookat(0,0,-1);
+    float dist_to_focus = (lookfrom-lookat).length();
+    float aperture = 2.0;
+    camera cam(lookfrom, lookat, vec3(0,1,0), 50, float(nx)/float(ny), aperture, dist_to_focus);
 
     for (int j = ny - 1; j >= 0; j--) {
         for (int i = 0; i < nx; i++) {
@@ -123,7 +136,7 @@ int main() {
                 float v = float(j + rand_unit()) / float(ny);
                 ray r = cam.get_ray(u, v);
                 vec3 p = r.point_at_parameter(2.0);
-                col += color(r, world);
+                col += color(r, world, 0);
            }
             col /= float(ns);
             // Gamma 2
@@ -136,4 +149,6 @@ int main() {
 
         }
     }
+
+    exit(0);
 }

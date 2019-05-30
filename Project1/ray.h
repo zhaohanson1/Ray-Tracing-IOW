@@ -13,4 +13,8 @@ class ray
         vec3 A;
         vec3 B;
 };
+
+inline float rand_unit() {
+    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+}
 #endif
